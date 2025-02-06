@@ -20,7 +20,6 @@
 #include "oplus_wireless.h"
 #include "charger_ic/oplus_short_ic.h"
 #include "charger_ic/oplus_switching.h"
-#include "charger_ic/oplus_battery_sm8550.h"
 #include "oplus_debug_info.h"
 #include "oplus_chg_track.h"
 #include "op_wlchg_v2/oplus_chg_wls.h"
@@ -2631,13 +2630,17 @@ static ssize_t adapter_power_store(struct device *dev, struct device_attribute *
 }
 static DEVICE_ATTR_RW(adapter_power);
 
+int __attribute__((weak)) oplus_abnormal_adapter_disconnect_keep(void)
+{
+	return 0;
+}
+
 static int protocol_type_by_user = -1;
 static ssize_t protocol_type_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	struct oplus_chg_chip *chip = NULL;
 	int fast_chg_type = CHARGER_SUBTYPE_DEFAULT;
-	static int protocol_type = CHARGER_SUBTYPE_DEFAULT;
 	int subtype = CHARGER_SUBTYPE_DEFAULT;
 	int rc = 0;
 	bool wls_online = false;
@@ -2697,12 +2700,6 @@ static ssize_t protocol_type_show(struct device *dev,
 	if (protocol_type_by_user > 0)
 		fast_chg_type = protocol_type_by_user;
 
-	if (chip->mmi_chg == 1) {
-		protocol_type = fast_chg_type;
-	}
-	if ((chip->mmi_chg == 0) && (chip->charge_limit_enable_status == 1)) {
-		return sprintf(buf, "%d\n", protocol_type);
-	}
 	return sprintf(buf, "%d\n", fast_chg_type);
 }
 
@@ -3167,7 +3164,7 @@ static ssize_t read_gauge_reg_show(struct device *dev,
 #define CHG_UP_PAGE_SIZE 128
 #define PARMS_LEN 10
 #define SEPRATOR_SIGN ","
-char chg_up_buf[CHG_UP_PAGE_SIZE] = {0};
+static char chg_up_buf[CHG_UP_PAGE_SIZE] = {0};
 int oplus_update_chg_up_limit_parms(struct oplus_chg_chip *chip, const char *buf)
 {
 	int ret = 0;
@@ -3233,18 +3230,6 @@ int oplus_update_chg_up_limit_parms(struct oplus_chg_chip *chip, const char *buf
 	return ret;
 }
 
-static ssize_t chg_up_limit_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct oplus_configfs_device *chip = dev->driver_data;
-
-	if (!chip) {
-		chg_err("chip is NULL\n");
-		return -EINVAL;
-	}
-
-	return sprintf(buf, "%s\n", chg_up_buf);
-}
-
 static ssize_t chg_up_limit_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
 	int rc;
@@ -3258,6 +3243,19 @@ static ssize_t chg_up_limit_store(struct device *dev, struct device_attribute *a
 
 	return count;
 }
+
+static ssize_t chg_up_limit_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct oplus_configfs_device *chip = dev->driver_data;
+
+	if (!chip) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+
+	return sprintf(buf, "%s\n", chg_up_buf);
+}
+
 DEVICE_ATTR_RW(chg_up_limit);
 
 static ssize_t read_gauge_reg_store(struct device *dev,

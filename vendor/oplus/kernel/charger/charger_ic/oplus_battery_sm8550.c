@@ -9639,7 +9639,6 @@ int oplus_abnormal_adapter_disconnect_keep(void)
 		(oplus_chg_get_fast_chg_type() == ADAPTER_ID_65W_0X14) &&
 		oplus_is_pd_svooc() && !oplus_voocphy_get_fastchg_start())
 			ret_val = 1;
-
 	return ret_val;
 }
 

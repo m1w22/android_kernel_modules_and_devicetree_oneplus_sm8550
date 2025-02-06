@@ -723,5 +723,4 @@ enum {
 	ADAPTER_ID_120W_0X6B = 0x6B,
 };
 
-int oplus_abnormal_adapter_disconnect_keep(void);
 #endif /*__SM8550_CHARGER_H*/

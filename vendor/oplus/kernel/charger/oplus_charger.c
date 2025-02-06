@@ -156,7 +156,6 @@ int enable_charger_log = 2;
 int charger_abnormal_log = 0;
 int tbatt_pwroff_enable = 1;
 static int mcu_status = 0;
-static int pre_val = 0;
 extern bool oplus_is_power_off_charging(struct oplus_vooc_chip *chip);
 extern bool oplus_voocphy_chip_is_null(void);
 
@@ -3879,7 +3878,11 @@ void oplus_chg_test_gpio_info_init(struct oplus_chg_chip *chip)
 
 	switch2_gpio = of_get_named_gpio(node, "oplus,switch2-ctrl-gpio", 0);
 	if (gpio_is_valid(switch2_gpio)) {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0))
 		gpio_chip = gpio_to_chip(switch2_gpio);
+#else
+		gpio_chip = gpiod_to_chip(gpio_to_desc(switch2_gpio));
+#endif
 		g_chg_switch2_gpio_info[SWITCH2_GPIO_INFO_INDEX].chip = gpio_chip;
 		g_chg_switch2_gpio_info[SWITCH2_GPIO_INFO_INDEX].num =
 			switch2_gpio - gpio_chip->base;
@@ -3891,11 +3894,19 @@ void oplus_chg_test_gpio_info_init(struct oplus_chg_chip *chip)
 	uart_tx = of_get_named_gpio(node, "oplus,uart_tx-gpio", 0);
 	uart_rx = of_get_named_gpio(node, "oplus,uart_rx-gpio", 0);
 	if (gpio_is_valid(uart_tx) && gpio_is_valid(uart_rx)) {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0))
 		gpio_chip = gpio_to_chip(uart_tx);
+#else
+		gpio_chip = gpiod_to_chip(gpio_to_desc(uart_tx));
+#endif
 		g_chg_uart_gpio_info[UART_TX_GPIO_INFO_INDEX].chip = gpio_chip;
 		g_chg_uart_gpio_info[UART_TX_GPIO_INFO_INDEX].num =
 			uart_tx - gpio_chip->base;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0))
 		gpio_chip = gpio_to_chip(uart_rx);
+#else
+		gpio_chip = gpiod_to_chip(gpio_to_desc(uart_rx));
+#endif
 		g_chg_uart_gpio_info[UART_RX_GPIO_INFO_INDEX].chip = gpio_chip;
 		g_chg_uart_gpio_info[UART_RX_GPIO_INFO_INDEX].num =
 			uart_rx - gpio_chip->base;
@@ -6031,6 +6042,8 @@ int oplus_chg_parse_charger_dt(struct oplus_chg_chip *chip)
 
 	chip->boot_reset_adapter = of_property_read_bool(node, "oplus,boot_reset_adapter");
 	chip->quick_mode_gain_support = of_property_read_bool(node, "oplus,quick_mode_gain_support");
+	chip->support_nomal_5v3a = of_property_read_bool(node, "qcom,support_nomal_5v3a");
+	charger_xlog_printk(CHG_LOG_CRTI, "qcom,support_nomal_5v3a = %d\n", chip->support_nomal_5v3a);
 	chip->support_hot_enter_kpoc = of_property_read_bool(node, "oplus,support_hot_enter_kpoc");
 	rc = of_property_read_u32(node, "oplus,poweroff_high_batt_temp", &chip->poweroff_high_batt_temp);
 	if (rc)
@@ -8258,7 +8271,7 @@ void oplus_chg_variables_reset(struct oplus_chg_chip *chip, bool in)
 	chip->adsp_notify_ap_suspend = 0;
 	chip->stop_voter = 0x00;
 	chip->charging_state = CHARGING_STATUS_CCCV;
-	pre_val = 0;
+	chip->pre_chg_up_limit_mmi_val = 0;
 #ifndef SELL_MODE
 	if (chip->mmi_fastchg == 0) {
 		chip->mmi_chg = 0;
@@ -8623,6 +8636,7 @@ static void oplus_chg_variables_init(struct oplus_chg_chip *chip)
 	chip->input_current_limit = 0;
 	chip->charging_current = 0;
 	chip->read_by_reg = 0;
+	chip->pre_chg_up_limit_mmi_val = 0;
 }
 
 static void oplus_chg_fail_action(struct oplus_chg_chip *chip)
@@ -10608,12 +10622,12 @@ int oplus_enforce_chg_up_limit_result(struct oplus_chg_chip *chip, bool cut_off_
 	int rc = 0;
 	static int pre_is_force_charge_limit = 0;
 
-	chg_info("oplus_enforce_chg_up_limit_result begain %d %d %d %d\n", val, pre_val,
+	chg_info("oplus_enforce_chg_up_limit_result begain %d %d %d %d\n", val, chip->pre_chg_up_limit_mmi_val,
 		chg_up_limit_data.is_force_set_charge_limit, pre_is_force_charge_limit);
-	if (val == pre_val && chg_up_limit_data.is_force_set_charge_limit == pre_is_force_charge_limit)
-		return rc; 
+	if (val == chip->pre_chg_up_limit_mmi_val && chg_up_limit_data.is_force_set_charge_limit == pre_is_force_charge_limit)
+		return rc;
 
-	pre_val = val;
+	chip->pre_chg_up_limit_mmi_val = val;
 	pre_is_force_charge_limit = chg_up_limit_data.is_force_set_charge_limit;
 
 	if (chg_up_limit_data.is_force_set_charge_limit == 0) {
@@ -10642,9 +10656,7 @@ void monitor_ui_soc_to_enable_chg_up_limit(struct oplus_chg_chip *chip)
 	chg_info("monitor_ui_soc_to_enable_chg_up_limit: charge_limit_enable=%d, ui_soc=%d %d %d %d",
 		chg_up_limit_data.charge_limit_enable, chip->ui_soc, chg_up_limit_data.charge_limit_value,
 		chg_up_limit_data.charge_limit_recharge_value, over_count);
-	chip->charge_limit_enable_status = chg_up_limit_data.charge_limit_enable;
 
-	chip->charge_limit_enable_status = chg_up_limit_data.charge_limit_enable;
 	if (chg_up_limit_data.charge_limit_enable == 1) {
 		if (chip->ui_soc > chg_up_limit_data.charge_limit_value) {
 			over_count = 0;
@@ -13692,10 +13704,7 @@ int oplus_chg_show_vooc_logo_ornot(void)
 		return 1;
 	} else if (oplus_pps_get_pps_dummy_started() ||
 		   oplus_pps_get_pps_fastchg_started()) {
-		if (oplus_pps_get_adapter_type() == PPS_ADAPTER_THIRD)
-			return 0;
-		else
-			return 1;
+		return 1;
 	} else if (oplus_ufcs_show_vooc()) {
 		return 1;
 	} else if (oplus_vooc_get_fastchg_to_normal() == true ||
@@ -14210,6 +14219,7 @@ int oplus_convert_pps_current_to_level(struct oplus_chg_chip *chip, int val)
 
 static const int cool_down_current_limit_normal[6] = { 1200, 1500, 2000, 2000, 2000, 2000 };
 static const int cool_down_current_limit_onebat[6] = { 1200, 1500, 2000, 1500, 2000, 2000 };
+static const int cool_down_current_limit_onebat_5v3a[8] = { 500, 900, 1200, 1500, 2000, 2500, 3000, 3000};
 static const int cool_down_current_limit_onebat_nohv[6] = { 1200, 1500, 2000, 2000, 2000, 2000 };
 static const int old_cool_down_current_limit_onebat[6] = {
 	500, 900, 1200, 1500, 2000, 1500
@@ -14660,7 +14670,7 @@ void oplus_smart_charge_by_cool_down(struct oplus_chg_chip *chip, int val)
 	int onebat_index_temp = 0;
 	int normal_index_temp = 0;
 	int vooc_index_temp = 0;
-	int m_cool_down_current_limit_onebat[6] = { 0 };
+	int m_cool_down_current_limit_onebat[8] = { 0 };
 	int cool_down_force_5v_limit_onebat = 0;
 
 	if (!chip) {
@@ -14669,8 +14679,12 @@ void oplus_smart_charge_by_cool_down(struct oplus_chg_chip *chip, int val)
 
 	c_level_index = val;
 
-	onebat_index_temp =
-		ARRAY_SIZE(cool_down_current_limit_onebat) < val ? ARRAY_SIZE(cool_down_current_limit_onebat) : val;
+	if (!chip->support_nomal_5v3a)
+		onebat_index_temp =
+			ARRAY_SIZE(cool_down_current_limit_onebat) < val ? ARRAY_SIZE(cool_down_current_limit_onebat) : val;
+	else
+		onebat_index_temp =
+			ARRAY_SIZE(cool_down_current_limit_onebat_5v3a) < val ? ARRAY_SIZE(cool_down_current_limit_onebat_5v3a) : val;
 	normal_index_temp =
 		ARRAY_SIZE(cool_down_current_limit_normal) < val ? ARRAY_SIZE(cool_down_current_limit_normal) : val;
 	vooc_index_temp =
@@ -14685,7 +14699,10 @@ void oplus_smart_charge_by_cool_down(struct oplus_chg_chip *chip, int val)
 		memcpy(m_cool_down_current_limit_onebat, cool_down_current_limit_onebat_nohv, sizeof(int) * 6);
 		cool_down_force_5v_limit_onebat = NEW_FORCE_5V_LIMIT;
 	} else {
-		memcpy(m_cool_down_current_limit_onebat, cool_down_current_limit_onebat, sizeof(int) * 6);
+		if (!chip->support_nomal_5v3a)
+			memcpy(m_cool_down_current_limit_onebat, cool_down_current_limit_onebat, sizeof(int) * 6);
+		else
+			memcpy(m_cool_down_current_limit_onebat, cool_down_current_limit_onebat_5v3a, sizeof(int) * 8);
 		cool_down_force_5v_limit_onebat = NEW_FORCE_5V_LIMIT;
 	}
 
@@ -16325,7 +16342,6 @@ int oplus_get_adapter_power(void)
 	bool vooc_online = false;
 	int fast_chg_type = 0;
 	struct oplus_chg_chip *chip = g_charger_chip;
-	static int adapter_power = 10000;
 
 	if (is_wls_ocm_available(g_charger_chip))
 		wls_online = oplus_wpc_get_online_status();
@@ -16364,12 +16380,6 @@ int oplus_get_adapter_power(void)
 		default:
 			break;
 		}
-	}
-	if (chip->mmi_chg == 1) {
-		adapter_power = power;
-	}
-	if ((chip->mmi_chg == 0) && (chg_up_limit_data.charge_limit_enable == 1)) {
-		return adapter_power;
 	}
 	return power;
 }

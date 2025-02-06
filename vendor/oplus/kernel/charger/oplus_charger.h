@@ -10,6 +10,9 @@
 #include <linux/workqueue.h>
 #include <linux/version.h>
 #include <linux/thermal.h>
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(6, 6, 0))
+#include <linux/pinctrl/consumer.h>
+#endif
 #include "oplus_chg_core.h"
 #if __and(IS_MODULE(CONFIG_OPLUS_CHG), IS_MODULE(CONFIG_OPLUS_CHG_V2))
 #include "oplus_chg_symbol.h"
@@ -158,7 +161,9 @@
 #include "charger_ic/oplus_battery_sm8350.h"
 #elif defined CONFIG_OPLUS_SM8450_CHARGER
 #include "charger_ic/oplus_battery_sm8450.h"
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0))
 #define PLATFORM_SUPPORT_TIMESPEC 1
+#endif
 #elif defined CONFIG_OPLUS_SM8550_CHARGER
 #include "charger_ic/oplus_battery_sm8550.h"
 #elif defined OPLUS_CHG_SEPARATE_MUSE
@@ -1429,6 +1434,7 @@ struct oplus_chg_chip {
 	bool support_3p6_standard;
 	bool pdqc_9v_voltage_adaptive;
 	bool suport_pd_9v2a;
+	bool support_nomal_5v3a;
 	struct timespec quick_mode_time;
 	int start_time;
 	int quick_mode_start_time;
@@ -1571,7 +1577,6 @@ struct oplus_chg_chip {
 	bool support_shipmode_in_chgic;
 	bool not_support_usb_btb;
 	int read_by_reg;
-	int charge_limit_enable_status;
 
 	uint32_t protocol_supported_type;
 	uint32_t default_protocol_type;
@@ -1584,7 +1589,7 @@ struct oplus_chg_chip {
 	int usbtemp_temp_gap_with_batt_temp_in_over_hot;
 	bool anti_expansion_warning;
 	bool anti_expansion_error;
-	int charge_limit_enable_status;
+	int pre_chg_up_limit_mmi_val;
 };
 
 #define TTF_UPDATE_UEVENT_BIT		BIT(30)
