@@ -82,6 +82,9 @@ struct pwrkey_monitor_data {
 	unsigned int error_count;
 #if IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
 	struct notifier_block fb_notif;
+#if IS_ENABLED(CONFIG_OPLUS_MTK_DRM_SUB_NOTIFY)
+	struct notifier_block fb_notif_sub;
+#endif
 #endif
 	struct timer_list timer;
 	struct work_struct error_happen_work;
@@ -118,6 +121,7 @@ ssize_t get_pwkey_stages(char *buf);
 void record_stage(const char *buf);
 int get_systemserver_pid(void);
 long get_timestamp_ms(void);
+bool is_slowkernel_skip(void);
 void set_timer_started(bool enable);
 void doPanic(void);
 void recovery_timer_func(struct timer_list *t);

@@ -43,12 +43,14 @@ static char bright_last_skip_block_stages[][64] = {
 static char bright_skip_stages[][64] = {
 	{ "POWER_wakeUpInternal" }, /* quick press powerkey, power decide wakeup when bright check, skip */
 	{ "POWERKEY_wakeUpFromPowerKey" }, /* quick press powerkey, power decide wakeup when bright check, skip */
+	{ "LIGHT_setScreenState_2_ON" }, /* Bright screen stage caused by application appears in the screen extinguishing process, skip */
 	{ "CANCELED_" }, /* if CANCELED_ event write in bright check stage, skip */
 };
 
 static int br_start_check_systemid = -1;
 u64 mLastPwkTime = 0;
 u64 FrequencyInterval = 300000;
+bool error_flag = false;
 
 int bright_screen_timer_restart(void)
 {
@@ -65,7 +67,7 @@ int bright_screen_timer_restart(void)
 		return -1;
 	}
 
-	if (g_bright_data.blank == THEIA_PANEL_UNBLANK_VALUE) {
+	if ((g_bright_data.blank == THEIA_PANEL_UNBLANK_VALUE) && !error_flag) {
 		br_start_check_systemid = get_systemserver_pid();
 		mod_timer(&g_bright_data.timer, jiffies + msecs_to_jiffies(g_bright_data.timeout_ms));
 		del_timer(&g_black_data.timer);
@@ -105,10 +107,12 @@ static void send_bright_screen_dcs_msg(void)
 	mLastPwkTime = ts;
 	BRIGHT_DEBUG_PRINTK("send_bright_screen_dcs_msg mLastPwkTime is %lld ms\n", mLastPwkTime);
 	get_brightscreen_check_dcs_logmap(logmap);
+	/* remove theia event in os15
 	theia_send_event(THEIA_EVENT_PWK_SHUTDOWN_MONITOR, THEIA_LOGINFO_SYSTEM_SERVER_TRACES
 		 | THEIA_LOGINFO_EVENTS_LOG | THEIA_LOGINFO_KERNEL_LOG | THEIA_LOGINFO_ANDROID_LOG
 		 | THEIA_LOGINFO_DUMPSYS_SF | THEIA_LOGINFO_DUMPSYS_POWER,
 		get_systemserver_pid(), logmap);
+	*/
 	get_pwkey_stages(stages);
 	trace_bright_screen_monitor(get_timestamp_ms(), SYSTEM_ID, PWKKEY_DCS_TAG, PWKKEY_DCS_EVENTID, PWKKEY_BRIGHT_SCREEN_DCS_LOGTYPE, g_bright_data.error_id,
 			g_bright_data.error_count, get_systemserver_pid(), stages);
@@ -142,6 +146,11 @@ static bool is_bright_contain_skip_stage(void)
 	char stages[512] = {0};
 	int i = 0, nArrayLen;
 	get_pwkey_stages(stages);
+	/* skip stage for alm: 7898087 */
+	if (strstr(stages, "LIGHT_setScreenState_3_OFF") != NULL) {
+		BRIGHT_DEBUG_PRINTK("is_sepical_stage_os15 return true");
+		return true;
+	}
 
 	nArrayLen = ARRAY_SIZE(bright_skip_stages);
 	for (i = 0; i < nArrayLen; i++) {
@@ -160,6 +169,8 @@ static bool is_need_skip(void)
 		return true;
 
 	if (is_bright_contain_skip_stage())
+		return true;
+	if (is_slowkernel_skip())
 		return true;
 
 	return false;
@@ -184,8 +195,10 @@ static void bright_error_happen_work(struct work_struct *work)
 	struct timespec64 ts;
 
 	/* for bright screen check, check if need skip, we direct return */
-	if (is_need_skip())
+	if (is_need_skip()) {
+		error_flag = false;
 		return;
+	}
 
 	if (bri_data->error_count == 0) {
 		ktime_get_real_ts64(&ts);
@@ -206,6 +219,7 @@ static void bright_error_happen_work(struct work_struct *work)
 		bri_data->error_id, bri_data->error_count);
 
 	set_timer_started(true);
+	error_flag = false;
 	delete_timer_bright("BR_SCREEN_ERROR_HAPPEN", false);
 }
 
@@ -217,18 +231,21 @@ static void bright_timer_func(struct timer_list *t)
 
 	/* stop recored stage when happen work for alm:6864732 */
 	set_timer_started(false);
-
+	error_flag = true;
 #if IS_ENABLED(CONFIG_DRM_PANEL_NOTIFY) || IS_ENABLED(CONFIG_QCOM_PANEL_EVENT_NOTIFIER)
 	if (g_bright_data.active_panel == NULL || g_bright_data.cookie == NULL) {
 		BRIGHT_DEBUG_PRINTK("br check register panel not ready\n");
+		error_flag = false;
 		return;
 	}
 #endif
 
 	if (br_start_check_systemid == get_systemserver_pid())
 		schedule_work(&p->error_happen_work);
-	else
+	else {
+		error_flag = false;
 		BRIGHT_DEBUG_PRINTK("bright_timer_func, not valid for check, skip\n");
+	}
 }
 
 #if IS_ENABLED(CONFIG_DRM_PANEL_NOTIFY) || IS_ENABLED(CONFIG_QCOM_PANEL_EVENT_NOTIFIER)
@@ -287,6 +304,33 @@ static int bright_fb_notifier_callback(struct notifier_block *self,
 
 	return 0;
 }
+#if IS_ENABLED(CONFIG_OPLUS_MTK_DRM_SUB_NOTIFY)
+static int bright_fb_notifier_sub_callback(struct notifier_block *self,
+	unsigned long event, void *data)
+{
+	switch (event) {
+	case THEIA_PANEL_BLANK_EVENT:
+		g_bright_data.blank = *(int *)data;
+		if (g_bright_data.status != BLACK_STATUS_CHECK_DEBUG) {
+			if (g_bright_data.blank == THEIA_PANEL_BLANK_VALUE) {
+				delete_timer_bright("FINISH_FB", true);
+				del_timer(&g_recovery_data.timer);
+				BRIGHT_DEBUG_PRINTK("bright_fb_notifier_sub_callback: del_timer g_recovery_data del in mtk\n");
+				BRIGHT_DEBUG_PRINTK("bright_fb_notifier_sub_callback: del timer, status:%d blank:%d\n",
+					g_bright_data.status, g_bright_data.blank);
+			}
+		} else {
+			BRIGHT_DEBUG_PRINTK("bright_fb_notifier_sub_callback debug: status:%d blank:%d\n",
+				g_bright_data.status, g_bright_data.blank);
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+#endif
 #endif
 
 static int bright_screen_cancel_proc_show(struct seq_file *seq_file, void *data)
@@ -391,7 +435,8 @@ void bright_screen_check_init(void)
 		return;
 	}
 #if IS_ENABLED(CONFIG_OPLUS_MTK_DRM_SUB_NOTIFY)
-	if (mtk_disp_sub_notifier_register("oplus_theia_sub", &g_bright_data.fb_notif)) {
+	g_bright_data.fb_notif_sub.notifier_call = bright_fb_notifier_sub_callback;
+	if (mtk_disp_sub_notifier_register("oplus_theia_sub", &g_bright_data.fb_notif_sub)) {
 		g_bright_data.status = BRIGHT_STATUS_INIT_FAIL;
 		BRIGHT_DEBUG_PRINTK("bright_screen_check_init, register sub fb notifier fail\n");
 		return;
@@ -426,7 +471,7 @@ void bright_screen_exit(void)
 #elif IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
 	mtk_disp_notifier_unregister(&g_bright_data.fb_notif);
 	#if IS_ENABLED(CONFIG_OPLUS_MTK_DRM_SUB_NOTIFY)
-	mtk_disp_sub_notifier_unregister(&g_bright_data.fb_notif);
+	mtk_disp_sub_notifier_unregister(&g_bright_data.fb_notif_sub);
 	#endif
 #endif
 }

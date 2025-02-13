@@ -937,10 +937,14 @@ int tp_touch_healthinfo_handle(struct monitor_data *monitor_data,
 				if (monitor_data->points_state[i].jumping_times > JUMPING_POINT_TIMES) {
 					if (!monitor_data->points_state[i].is_down_handled) {
 						/*add_point_to_record(&monitor_data->jumping_points, points[i]);*/
-						monitor_data->jumping_points_count_array[points[i].y *
-								 (monitor_data->rx_num / 2) / monitor_data->max_y *
-								 (monitor_data->tx_num / 2) + points[i].x *
-								 (monitor_data->tx_num / 2) / monitor_data->max_x]++;
+						if ((points[i].y >= 0 && points[i].y < monitor_data->max_y)
+								&& (points[i].x >= 0 && points[i].x < monitor_data->max_x)
+								&& (monitor_data->max_y != 0 && monitor_data->max_x != 0)) {
+								monitor_data->jumping_points_count_array[points[i].y *
+										(monitor_data->rx_num / 2) / monitor_data->max_y *
+										(monitor_data->tx_num / 2) + points[i].x *
+										(monitor_data->tx_num / 2) / monitor_data->max_x]++;
+						} /* Judge whether it is abnormal */
 						catch_delta_data(monitor_data,
 								 monitor_data->jumping_point_delta_data);/*catch delta data*/
 						monitor_data->points_state[i].is_down_handled = true;
