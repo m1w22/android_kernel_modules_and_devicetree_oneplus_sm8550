@@ -154,6 +154,14 @@ static int cts_mode_switch(void *chip_data, work_mode mode, int flag)
             if (ret)
                 TPD_INFO("<E> Set earjack mode failed %d\n", ret);
             break;
+		case MODE_WATERPROOF:
+			TPD_INFO("<I> switch MODE_WATERPROOF: %s\n", flag ? "In" : "Out");
+			ret = cts_if->set_waterproof_mode(cts_dev, flag);
+			break;
+		case MODE_AOD:
+			TPD_INFO("<I> switch MODE_AOD: %s\n", flag ? "In" : "Out");
+			ret = cts_if->set_aod_mode(cts_dev, flag);
+			break;
         default:
             break;
     }
@@ -288,31 +296,49 @@ static int cts_get_gesture_info(void *chip_data,
     //struct cts_interface *cts_if = cts_dev->cts_if;
     struct cts_device_touch_info *touch_info = &cts_dev->rtdata.touch_info;
     struct cts_device_gesture_info *gesture_info = &cts_dev->rtdata.gesture_info;
-    uint32_t gesture_type;
-   
+    uint32_t gesture_type = 0;
+
     memcpy(gesture_info, touch_info, sizeof(struct cts_device_gesture_info));
 
     TPD_INFO("<I> Process gesture, id=0x%02x, num_points=%d\n",
             gesture_info->gesture_id, gesture_info->num_points);
 
     memset(gesture, 0, sizeof(*gesture));
-  switch(gesture_info->gesture_id) {
-    case CTS_GESTURE_D_TAP: gesture_type = DOU_TAP;          break;
-    case CTS_GESTURE_V:     gesture_type = UP_VEE;           break;
-    case CTS_GESTURE_M:     gesture_type = M_GESTRUE;        break;
-    case CTS_GESTURE_W:     gesture_type = W_GESTURE;        break;
-    case CTS_GESTURE_O:     gesture_type = CIRCLE_GESTURE;          break;
-    case CTS_GESTURE_RV:    gesture_type = DOWN_VEE;         break;
-    //case CTS_GESTURE_UP:    gesture_type = Down2UpSwip;     break;
-    //case CTS_GESTURE_DOWN:  gesture_type = Up2DownSwip;     break;
-    //case CTS_GESTURE_LEFT:  gesture_type = Right2LeftSwip;  break;
-    //case CTS_GESTURE_RIGHT: gesture_type = Left2RightSwip;  break;
-    case CTS_GESTURE_DOUBLE: gesture_type = DOU_SWIP;         break;
-    case CTS_GESTURE_LR:    gesture_type = RIGHT_VEE;        break;
-    case CTS_GESTURE_RR:    gesture_type = LEFT_VEE;         break;
-    default: gesture_type = UnkownGesture;                  break;
-    }
-
+	switch(gesture_info->gesture_id) {
+		case CTS_GESTURE_D_TAP:
+			gesture_type = DOU_TAP;
+			break;
+		case CTS_GESTURE_V:
+			gesture_type = UP_VEE;
+			break;
+		case CTS_GESTURE_M:
+			gesture_type = M_GESTRUE;
+			break;
+		case CTS_GESTURE_W:
+			gesture_type = W_GESTURE;
+			break;
+		case CTS_GESTURE_O:
+			gesture_type = CIRCLE_GESTURE;
+			break;
+		case CTS_GESTURE_RV:
+			gesture_type = DOWN_VEE;
+			break;
+		case CTS_GESTURE_DOUBLE:
+			gesture_type = DOU_SWIP;
+			break;
+		case CTS_GESTURE_LR:
+			gesture_type = RIGHT_VEE;
+			break;
+		case CTS_GESTURE_RR:
+			gesture_type = LEFT_VEE;
+			break;
+		case CTS_GESTURE_S_TAP:
+			gesture_type = SINGLE_TAP;
+			break;
+		default:
+			TPD_INFO("Unknown gesture code\n");
+			break;
+	}
     gesture->gesture_type = gesture_type;
 
     if (gesture_info->num_points >= 1) {
@@ -438,7 +464,7 @@ static int cts_reset(void *chip_data)
     return 0;
 }
 
-static void cts_tp_touch_release(struct touchpanel_data *ts)
+/*static void cts_tp_touch_release(struct touchpanel_data *ts)
 {
 #ifdef TYPE_B_PROTOCOL
     int i = 0;
@@ -466,7 +492,7 @@ static void cts_tp_touch_release(struct touchpanel_data *ts)
     ts->view_area_touched = 0;
     ts->touch_count = 0;
     ts->irq_slot = 0;
-}
+}*/
 
 static int cts_esd_handle(void* chip_data)
 {
@@ -490,7 +516,10 @@ static int cts_esd_handle(void* chip_data)
                 break;
         } while (retry--);
         ret = -1;
-        cts_tp_touch_release(tsdata);
+	if (tsdata == NULL) {
+		return -EINVAL;
+	}
+	tp_touch_btnkey_release(tsdata->tp_index);
     } else {
         ret = 0;
         TPD_DEBUG("<D> None ESD event!\n");
@@ -549,10 +578,13 @@ static void cts_rate_white_list_ctrl(void *chip_data, int value)
 	}
 
 	switch (value) {
-        case 120:  /*120HZ*/
+        case 120:		/* 120HZ */
+            cmd = 0x90;
+			break;
+        case 180:		/* 180HZ */
             cmd = 0xA0;
-            break;
-        case 180:   /*  60HZ*/
+			break;
+        case 240:		/* 240HZ */
             cmd = 0xC0;
             break;
 		default:
@@ -755,7 +787,7 @@ static struct debug_info_proc_operations debug_info_proc_ops = {
     .delta_read         = cts_delta_read,
     .main_register_read = NULL,
 };
-/*
+
 static int cts_update_headfile_fw(void *chip_data, struct panel_info *panel_data)
 {
     struct chipone_ts_data *cts_data = (struct chipone_ts_data *)chip_data;
@@ -768,8 +800,8 @@ static int cts_update_headfile_fw(void *chip_data, struct panel_info *panel_data
     cts_firmware.name = panel_data->fw_name;
     cts_firmware.hwid = cts_dev->hwdata->hwid;
     cts_firmware.fwid = cts_dev->hwdata->fwid;
-    cts_firmware.data = (u8 *)panel_data->firmware_headfile.firmware_data;
-    cts_firmware.size = panel_data->firmware_headfile.firmware_size;
+    cts_firmware.data = (u8 *)tsdata->firmware_in_dts->data;
+    cts_firmware.size = tsdata->firmware_in_dts->size;
 
     TPD_INFO("<I> Fw name:%s!\n", cts_firmware.name);
     TPD_INFO("<I> Fw size:%zu!\n", cts_firmware.size);
@@ -785,7 +817,7 @@ static int cts_update_headfile_fw(void *chip_data, struct panel_info *panel_data
 
     return 0;
 }
-*/
+
 
 static int cts_gstr_rawdata_test(struct seq_file *s, void *chip_data,
 	struct auto_testdata *cts_testdata, struct test_item_info *p_test_item_info)
@@ -1394,7 +1426,8 @@ static int cts_driver_probe(struct spi_device *client)
     }
 
     disable_irq_nosync(tsdata->irq);
-
+	tsdata->tp_suspend_order = TP_LCD_SUSPEND;
+	tsdata->tp_resume_order = LCD_TP_RESUME;
     cts_data->pdata->rst_gpio = tsdata->hw_res.reset_gpio;
 
     ret = cts_plat_reset_device(cts_data->pdata);
@@ -1407,13 +1440,17 @@ static int cts_driver_probe(struct spi_device *client)
         TPD_INFO("<E> Probe device failed %d\n", ret);
         goto err_free_common_touch;
     }
-/*
-    ret = cts_update_headfile_fw(tsdata->chip_data, &tsdata->panel_data);
-    if (ret) {
-        TPD_INFO("<E> update head firmware failed\n");
-        //goto err_free_common_touch;
-    }
-*/
+#ifdef CONFIG_TOUCHPANEL_MTK_PLATFORM
+	if (tsdata->boot_mode == RECOVERY_BOOT) {
+#else
+	if (tsdata->boot_mode == MSM_BOOT_MODE__RECOVERY) {
+#endif
+		ret = cts_update_headfile_fw(tsdata->chip_data, &tsdata->panel_data);
+		if (ret) {
+			TPD_INFO("<E> update head firmware failed\n");
+			goto err_free_common_touch;
+		}
+	}
     enable_irq(tsdata->irq);
 
     ret = cts_tool_init(cts_data);

@@ -47,6 +47,9 @@
 #include <oplus_mms.h>
 #include <oplus_mms_gauge.h>
 #include <oplus_impedance_check.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+#include <linux/pinctrl/consumer.h>
+#endif
 #include "../voocphy/oplus_voocphy.h"
 #include "oplus_hal_nu2112a.h"
 
@@ -878,17 +881,30 @@ static bool nu2112a_get_pd_svooc_config(struct oplus_voocphy_manager *chip)
 		return false;
 }
 
-static int nu2112a_set_chg_pmid2out(bool enable)
+static int nu2112a_set_chg_pmid2out(bool enable, int reason)
 {
 	if (!oplus_voocphy_mg) {
 		chg_err("Failed\n");
 		return 0;
 	}
 
-	if (enable)
-		return nu2112a_write_byte(oplus_voocphy_mg->client, NU2112A_REG_05, 0x33); /*PMID/2-VOUT < 10%VOUT*/
-	else
-		return nu2112a_write_byte(oplus_voocphy_mg->client, NU2112A_REG_05, 0xA3); /*PMID/2-VOUT < 10%VOUT*/
+	if (enable) {
+		if (reason == SETTING_REASON_SVOOC)
+			return nu2112a_write_byte(oplus_voocphy_mg->client, NU2112A_REG_05, 0x31); /*PMID/2-VOUT < 10%VOUT*/
+		else if (reason == SETTING_REASON_VOOC)
+			return nu2112a_write_byte(oplus_voocphy_mg->client, NU2112A_REG_05, 0x33);
+		else
+			chg_err("no type for set_chg_pmid2out\n");
+	} else {
+		if (reason == SETTING_REASON_SVOOC)
+			return nu2112a_write_byte(oplus_voocphy_mg->client, NU2112A_REG_05, 0xB1); /*PMID/2-VOUT < 10%VOUT*/
+		else if (reason == SETTING_REASON_VOOC)
+			return nu2112a_write_byte(oplus_voocphy_mg->client, NU2112A_REG_05, 0xA3);
+		else
+			chg_err("no type for set_chg_pmid2out\n");
+	}
+
+	return 0;
 }
 
 static bool nu2112a_get_chg_pmid2out(void)
@@ -1930,7 +1946,11 @@ static int nu2112a_ic_register(struct nu2112a_device *chip)
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+static int nu2112a_driver_probe(struct i2c_client *client)
+#else
 static int nu2112a_driver_probe(struct i2c_client *client, const struct i2c_device_id *id)
+#endif
 {
 	struct nu2112a_device *chip;
 	struct oplus_voocphy_manager *voocphy;
@@ -2066,6 +2086,18 @@ static const struct dev_pm_ops nu2112a_pm_ops = {
 	.suspend = nu2112a_pm_suspend,
 };
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+static void nu2112a_driver_remove(struct i2c_client *client)
+{
+	struct oplus_voocphy_manager *chip = i2c_get_clientdata(client);
+
+	if (!chip)
+		return;
+
+	devm_kfree(&client->dev, chip);
+	return;
+}
+#else
 static int nu2112a_driver_remove(struct i2c_client *client)
 {
 	struct oplus_voocphy_manager *chip = i2c_get_clientdata(client);
@@ -2077,6 +2109,7 @@ static int nu2112a_driver_remove(struct i2c_client *client)
 
 	return 0;
 }
+#endif
 
 static void nu2112a_shutdown(struct i2c_client *client)
 {

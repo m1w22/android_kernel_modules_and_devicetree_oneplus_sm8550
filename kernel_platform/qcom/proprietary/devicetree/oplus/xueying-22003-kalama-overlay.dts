@@ -121,6 +121,11 @@
     explorer,data-drive-strength = <4>;
     explorer,spmi-drive-strength = <2>;
   };
+
+  oplus_kernel_state_monitor {
+    compatible = "oplus,kernel_state_monitor";
+  };
+
 };
 
 //#ifdef OPLUS_FEATRUE_ESIM

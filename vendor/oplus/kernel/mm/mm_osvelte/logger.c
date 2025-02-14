@@ -42,6 +42,7 @@
 #include "sys-memstat.h"
 #include "proc-memstat.h"
 #include "lowmem-dbg.h"
+#include "mm-config.h"
 
 /**
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
@@ -789,20 +790,38 @@ static int info_show(struct seq_file *m, void *unused)
 }
 DEFINE_PROC_SHOW_ATTRIBUTE(info);
 
-static const char *bg_kthread_comm[] = {
+/*
+ * below tasks would move to background cpuset by init.oplus.nandswap.sh
+ */
+
+static const char * const bg_kthread_comm[] = {
 	/* boost pool */
 	"bp_prefill_camera",
 	"bp_camera",
 	"bp_mtk_mm",
+
 	/* hybridswapd */
 	"hybridswapd",
+
 	/* chp kthread */
 	"khpage_poold",
+
 	/* uxmem refill kthread */
 	"ux_page_pool_",
 };
 
-static int bg_kthread_show(struct seq_file *s, void *unused)
+/*
+ * below tasks would move to kswapd-like cpuset by init.oplus.nandswap.sh
+ */
+ static const char * const kswapd_like_comm[] = {
+	"oom_reaper",
+	/* no support numa for now */
+	"kswapd0",
+	"kcompactd0",
+};
+
+static void iter_kthread_and_show(struct seq_file *s,
+				const char *const arr[], size_t sz)
 {
 	int i;
 	struct task_struct *p;
@@ -814,16 +833,32 @@ static int bg_kthread_show(struct seq_file *s, void *unused)
 		if (!(p->flags & PF_KTHREAD))
 			continue;
 
-		for (i = 0; i < ARRAY_SIZE(bg_kthread_comm); i++)
-			if (strstr(p->comm, bg_kthread_comm[i]))
+		for (i = 0; i < sz; i++)
+			if (strstr(p->comm, arr[i]))
 				seq_printf(s, "%-16s\t%-8d\t%*pbl\n",
 					   p->comm, p->tgid,
 					   cpumask_pr_args(p->cpus_ptr));
 	}
 	rcu_read_unlock();
+
+}
+
+static int bg_kthread_show(struct seq_file *s, void *unused)
+{
+	iter_kthread_and_show(s, bg_kthread_comm,
+			      ARRAY_SIZE(bg_kthread_comm));
+
 	return 0;
 }
 DEFINE_PROC_SHOW_ATTRIBUTE(bg_kthread);
+
+static int kswapd_like_kthread_show(struct seq_file *s, void *unused)
+{
+	iter_kthread_and_show(s, kswapd_like_comm,
+			      ARRAY_SIZE(kswapd_like_comm));
+	return 0;
+}
+DEFINE_PROC_SHOW_ATTRIBUTE(kswapd_like_kthread);
 
 static int __init logger_init(void)
 {
@@ -842,6 +877,8 @@ static int __init logger_init(void)
 
 	proc_create("info", 0444, root, &info_proc_ops);
 	proc_create("bg_kthread", 0444, root, &bg_kthread_proc_ops);
+	proc_create("kswapd_like_kthread", 0444, root,
+		    &kswapd_like_kthread_proc_ops);
 
 	ret = osvelte_lowmem_dbg_init(root);
 	if (unlikely(ret))
@@ -860,6 +897,8 @@ static int __init logger_init(void)
 	ret = sys_memstat_init(root);
 	if (unlikely(ret))
 		goto remove_procfs;
+
+	mm_config_init(root);
 
 	ret = create_log(DEV_NAME, 512 * 1024);
 	if (unlikely(ret))
@@ -887,6 +926,7 @@ static void __exit logger_exit(void)
 	remove_proc_subtree(DEV_NAME, NULL);
 	osvelte_lowmem_dbg_exit();
 	sys_memstat_exit();
+	mm_config_exit();
 }
 device_initcall(logger_init);
 module_exit(logger_exit);

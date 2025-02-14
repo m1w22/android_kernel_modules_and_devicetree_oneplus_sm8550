@@ -2829,6 +2829,7 @@ int oplus_display_set_power(struct drm_connector *connector,
 	if (power_mode == SDE_MODE_DPMS_OFF)
 		atomic_set(&display->panel->esd_pending, 1);
 
+	display->panel->power_state = power_mode;
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
 	case SDE_MODE_DPMS_LP2:

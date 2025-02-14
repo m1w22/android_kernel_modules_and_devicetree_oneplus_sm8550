@@ -1530,7 +1530,7 @@ static int bq27541_get_battery_cc(void) /*  sjc20150105  */
 			ret = gauge_read_i2c(gauge_ic, gauge_ic->cmd_addr.reg_cc, &cc);
 			if (ret) {
 				dev_err(gauge_ic->dev, "error reading cc.\n");
-				return ret;
+				return 0;
 			}
 			if (normal_range_judge(CC_MAX, CC_MIN, cc))
 				break;
@@ -1569,7 +1569,7 @@ static int bq27541_get_sub_battery_cc(void)
 			ret = gauge_read_i2c(sub_gauge_ic, sub_gauge_ic->cmd_addr.reg_cc, &cc);
 			if (ret) {
 				dev_err(sub_gauge_ic->dev, "error reading cc.\n");
-				return ret;
+				return 0;
 			}
 			if (normal_range_judge(CC_MAX, CC_MIN, cc))
 				break;
@@ -2893,7 +2893,7 @@ static int bq27541_get_battery_soh(void) /*  sjc20150105  */
 				ret_q = zy602_soh_hardware_defect_avoidance_scheme(gauge_ic, &soh);
 			if (ret || (ret_q < 0)) {
 				dev_err(gauge_ic->dev, "error reading soh.\n");
-				return ret;
+				return 0;
 			}
 			if (normal_range_judge(SOH_MAX, SOH_MIN, soh))
 				break;
@@ -2939,7 +2939,7 @@ static int bq27541_get_sub_battery_soh(void)
 				ret_q = zy602_soh_hardware_defect_avoidance_scheme(sub_gauge_ic, &soh);
 			if (ret || (ret_q < 0)) {
 				dev_err(sub_gauge_ic->dev, "error reading soh.\n");
-				return ret;
+				return 0;
 			}
 
 			if (normal_range_judge(SOH_MAX, SOH_MIN, soh))
@@ -6514,6 +6514,7 @@ static int bq28z610_get_2cell_voltage(void)
 #define AUTH_TAG "ogauge_auth="
 #define AUTH_SHA256_TAG "ogauge_sha256_auth="
 #define AUTH_PROP "ogauge_auth"
+#define BOOTARGS_PROP "bootargs"
 #define AUTH_SHA256_PROP "ogauge_sha256_auth"
 #ifdef MODULE
 #include <asm/setup.h>
@@ -6564,8 +6565,12 @@ static int get_auth_msg(u8 *source, u8 *rst)
 
 	str = strstr(oplus_chg_get_cmdline(AUTH_PROP), AUTH_TAG);
 	if (str == NULL) {
-		pr_err("Asynchronous authentication is not supported!!!\n");
-		return -1;
+		pr_err("Asynchronous auth not received from %s!!!\n", AUTH_PROP);
+		str = strstr(oplus_chg_get_cmdline(BOOTARGS_PROP), AUTH_TAG);
+		if (str == NULL) {
+			pr_err("Asynchronous auth not received from %s!!!\n", BOOTARGS_PROP);
+			return -1;
+		}
 	}
 	pr_info("%s\n", str);
 	str += strlen(AUTH_TAG);
