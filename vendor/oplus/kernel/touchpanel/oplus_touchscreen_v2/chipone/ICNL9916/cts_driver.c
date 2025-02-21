@@ -158,6 +158,10 @@ static int cts_mode_switch(void *chip_data, work_mode mode, int flag)
 			TPD_INFO("<I> switch MODE_WATERPROOF: %s\n", flag ? "In" : "Out");
 			ret = cts_if->set_waterproof_mode(cts_dev, flag);
 			break;
+		case MODE_AOD:
+			TPD_INFO("<I> switch MODE_AOD: %s\n", flag ? "In" : "Out");
+			ret = cts_if->set_aod_mode(cts_dev, flag);
+			break;
         default:
             break;
     }
@@ -292,31 +296,49 @@ static int cts_get_gesture_info(void *chip_data,
     //struct cts_interface *cts_if = cts_dev->cts_if;
     struct cts_device_touch_info *touch_info = &cts_dev->rtdata.touch_info;
     struct cts_device_gesture_info *gesture_info = &cts_dev->rtdata.gesture_info;
-    uint32_t gesture_type;
-   
+    uint32_t gesture_type = 0;
+
     memcpy(gesture_info, touch_info, sizeof(struct cts_device_gesture_info));
 
     TPD_INFO("<I> Process gesture, id=0x%02x, num_points=%d\n",
             gesture_info->gesture_id, gesture_info->num_points);
 
     memset(gesture, 0, sizeof(*gesture));
-  switch(gesture_info->gesture_id) {
-    case CTS_GESTURE_D_TAP: gesture_type = DOU_TAP;          break;
-    case CTS_GESTURE_V:     gesture_type = UP_VEE;           break;
-    case CTS_GESTURE_M:     gesture_type = M_GESTRUE;        break;
-    case CTS_GESTURE_W:     gesture_type = W_GESTURE;        break;
-    case CTS_GESTURE_O:     gesture_type = CIRCLE_GESTURE;          break;
-    case CTS_GESTURE_RV:    gesture_type = DOWN_VEE;         break;
-    //case CTS_GESTURE_UP:    gesture_type = Down2UpSwip;     break;
-    //case CTS_GESTURE_DOWN:  gesture_type = Up2DownSwip;     break;
-    //case CTS_GESTURE_LEFT:  gesture_type = Right2LeftSwip;  break;
-    //case CTS_GESTURE_RIGHT: gesture_type = Left2RightSwip;  break;
-    case CTS_GESTURE_DOUBLE: gesture_type = DOU_SWIP;         break;
-    case CTS_GESTURE_LR:    gesture_type = RIGHT_VEE;        break;
-    case CTS_GESTURE_RR:    gesture_type = LEFT_VEE;         break;
-    default: gesture_type = UnkownGesture;                  break;
-    }
-
+	switch(gesture_info->gesture_id) {
+		case CTS_GESTURE_D_TAP:
+			gesture_type = DOU_TAP;
+			break;
+		case CTS_GESTURE_V:
+			gesture_type = UP_VEE;
+			break;
+		case CTS_GESTURE_M:
+			gesture_type = M_GESTRUE;
+			break;
+		case CTS_GESTURE_W:
+			gesture_type = W_GESTURE;
+			break;
+		case CTS_GESTURE_O:
+			gesture_type = CIRCLE_GESTURE;
+			break;
+		case CTS_GESTURE_RV:
+			gesture_type = DOWN_VEE;
+			break;
+		case CTS_GESTURE_DOUBLE:
+			gesture_type = DOU_SWIP;
+			break;
+		case CTS_GESTURE_LR:
+			gesture_type = RIGHT_VEE;
+			break;
+		case CTS_GESTURE_RR:
+			gesture_type = LEFT_VEE;
+			break;
+		case CTS_GESTURE_S_TAP:
+			gesture_type = SINGLE_TAP;
+			break;
+		default:
+			TPD_INFO("Unknown gesture code\n");
+			break;
+	}
     gesture->gesture_type = gesture_type;
 
     if (gesture_info->num_points >= 1) {
@@ -442,7 +464,7 @@ static int cts_reset(void *chip_data)
     return 0;
 }
 
-static void cts_tp_touch_release(struct touchpanel_data *ts)
+/*static void cts_tp_touch_release(struct touchpanel_data *ts)
 {
 #ifdef TYPE_B_PROTOCOL
     int i = 0;
@@ -470,7 +492,7 @@ static void cts_tp_touch_release(struct touchpanel_data *ts)
     ts->view_area_touched = 0;
     ts->touch_count = 0;
     ts->irq_slot = 0;
-}
+}*/
 
 static int cts_esd_handle(void* chip_data)
 {
@@ -494,7 +516,10 @@ static int cts_esd_handle(void* chip_data)
                 break;
         } while (retry--);
         ret = -1;
-        cts_tp_touch_release(tsdata);
+	if (tsdata == NULL) {
+		return -EINVAL;
+	}
+	tp_touch_btnkey_release(tsdata->tp_index);
     } else {
         ret = 0;
         TPD_DEBUG("<D> None ESD event!\n");

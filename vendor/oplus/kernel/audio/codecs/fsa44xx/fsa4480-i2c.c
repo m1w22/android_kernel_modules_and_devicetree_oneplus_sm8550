@@ -26,7 +26,11 @@
 //#endif /*OPLUS_ARCH_EXTENDS*/
 
 #include "fsa4480-i2c.h"
+#if IS_ENABLED(CONFIG_OPLUS_PD_EXT_SUPPORT)
+#include "../../../../drivers/power/oplus/pd_ext/inc/tcpm.h"
+#else
 #include "../../../../drivers/misc/mediatek/typec/tcpc/inc/tcpm.h"
+#endif
 
 #define FSA4480_I2C_NAME	"fsa4480-driver"
 

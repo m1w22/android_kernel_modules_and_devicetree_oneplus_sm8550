@@ -1145,6 +1145,13 @@ static int cts_tcs_set_waterproof_mode(const struct cts_device *cts_dev, int cmd
 	return cts_tcs_spi_write(cts_dev, 9, 18, buf, sizeof(buf));
 }
 
+static int cts_tcs_set_aod_mode(const struct cts_device *cts_dev, int cmd)
+{
+	u8 buf[1];
+	buf[0] = (cmd == 0) ? 0 : 1;
+	return cts_tcs_spi_write(cts_dev, 2, 89, buf, sizeof(buf));
+}
+
 /*diaphragm ckliu*/
 static int cts_tcs_set_diaphragm_lv_set(const struct cts_device *cts_dev, int cmd)
 {
@@ -3452,6 +3459,7 @@ struct cts_interface tcs_if = {
 	.set_diaphragm_lv_set       = cts_tcs_set_diaphragm_lv_set,
 	.get_water_flag             = cts_tcs_get_water_flag,
 	.set_waterproof_mode		= cts_tcs_set_waterproof_mode,
+	.set_aod_mode				= cts_tcs_set_aod_mode,
     .read_hw_reg                = cts_tcs_read_hw_reg,
     .write_hw_reg               = cts_tcs_write_hw_reg,
 
