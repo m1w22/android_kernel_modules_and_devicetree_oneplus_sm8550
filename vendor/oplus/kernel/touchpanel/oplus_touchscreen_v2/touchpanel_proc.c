@@ -3851,6 +3851,11 @@ static ssize_t proc_glove_mode_write(struct file *file, const char __user *buffe
 		return count;
 	}
 
+	if (ts->is_suspended) {
+		TS_TP_INFO("%s: is_suspended, exit\n", __func__);
+		return count;
+	}
+
 	tp_copy_from_user(buf, sizeof(buf), buffer, count, 4);
 
 	if (kstrtoint(buf, 10, &value)) {
