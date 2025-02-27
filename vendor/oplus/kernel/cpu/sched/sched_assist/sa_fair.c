@@ -235,7 +235,7 @@ retry:
 		 * strict_ux case: The system runs on a heavy load picking no cpu,
 		 *  and prevent EAS picking a small core
 		 */
-		if (strict_ux_task(task) && cpu_online(cpu) && cpu_active(cpu) && cpumask_test_cpu(cpu, task->cpus_ptr) && (subopt_cpu == -1))
+		if (strict_ux_task(task) && (subopt_cpu == -1) && cpu_online(cpu) && cpu_active(cpu) && cpumask_test_cpu(cpu, task->cpus_ptr))
 			subopt_cpu = cpu;
 
 		/* If an ux thread running on this CPU, drop it! */

@@ -560,8 +560,7 @@ static inline bool current_is_key_task(void)
 
 	return test_task_ux(current) || rt_task(current)
 		|| test_bit(IM_FLAG_SURFACEFLINGER, &im_flag)
-		|| test_bit(IM_FLAG_SYSTEMSERVER_PID, &im_flag)
-		|| is_top_task(current);
+		|| test_bit(IM_FLAG_SYSTEMSERVER_PID, &im_flag);
 }
 
 static void __nocfi get_page_from_uxmempool(void *data, gfp_t gfp_mask, int order, int alloc_flags,
@@ -570,7 +569,7 @@ static void __nocfi get_page_from_uxmempool(void *data, gfp_t gfp_mask, int orde
 	struct page *page = NULL;
 	int i;
 
-	if (current_is_key_task() && !(gfp_mask & __GFP_DMA32)) {
+	if ((current_is_key_task() || is_top_task(current)) && !(gfp_mask & __GFP_DMA32)) {
 		page = ux_page_pool_alloc_pages(order, migratetype);
 		/* a refilled from __free_pages */
 		if (page && !page_count(page)) {
