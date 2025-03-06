@@ -2482,8 +2482,11 @@ static void oplus_ufcs_protocol_reply_adapter(struct work_struct *work)
 	if (rc < 0)
 		ufcs_err("reply to adapter failed!\n");
 
-	if (chip->soft_reset)
-		oplus_ufcs_protocol_send_soft_reset();
+	if (chip->soft_reset) {
+		rc = oplus_ufcs_protocol_send_soft_reset();
+		if (rc < 0)
+			ufcs_err("failed to send soft reset!\n");
+	}
 
 	oplus_ufcs_protocol_set_awake(chip, false);
 	oplus_ufcs_protocol_release_chip_lock();
@@ -2894,6 +2897,13 @@ static int oplus_ufcs_protocol_master_event_handle(void)
 	return ret;
 }
 
+static bool oplus_ufcs_ucp_enable(void)
+{
+	bool rc = true;
+
+	return rc;
+}
+
 struct oplus_ufcs_operations oplus_ufcs_protocol_ops = {
 	.ufcs_get_btb_temp_status = oplus_ufcs_protocol_get_btb_temp_status,
 	.ufcs_get_mos_temp_status = oplus_ufcs_protocol_get_mos_temp_status,
@@ -2934,6 +2944,7 @@ struct oplus_ufcs_operations oplus_ufcs_protocol_ops = {
 	.ufcs_get_mos1_switch = oplus_ufcs_protocol_get_mos1_switch,
 	.ufcs_set_mos1_switch = oplus_ufcs_protocol_set_mos1_switch,
 	.ufcs_event_handle = oplus_ufcs_protocol_master_event_handle,
+	.ufcs_cp_ucp_enable = oplus_ufcs_ucp_enable,
 };
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
