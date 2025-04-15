@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1651,7 +1651,7 @@ enum station_prefer_bw {
  * @force_rsne_override:            Force rsnie override from user
  * @single_tid:                     Set replay counter for all TID
  * @allow_tpc_from_ap:              Support for AP power constraint
- * @usr_disabled_roaming:           User config for roaming disable
+ * @usr_disabled_roaming:           User disable roaming for current connection
  * @usr_scan_probe_unicast_ra:      User config unicast probe req in scan
  * @max_li_modulated_dtim_time_ms: Max modulated DTIM time in ms.
  * @mlo_support_link_num:           max number of links that sta mlo supports

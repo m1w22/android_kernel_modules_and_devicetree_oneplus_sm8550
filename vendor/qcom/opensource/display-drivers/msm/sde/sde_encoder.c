@@ -5586,7 +5586,9 @@ int sde_encoder_prepare_commit(struct drm_encoder *drm_enc)
 	}
 
 #ifdef OPLUS_FEATURE_DISPLAY_ADFR
-	oplus_adfr_fakeframe_check(sde_enc);
+	if (sde_enc->crtc && sde_enc->cur_master && sde_enc->cur_master->connector) {
+		oplus_adfr_fakeframe_check(sde_enc);
+	}
 #endif /* OPLUS_FEATURE_DISPLAY_ADFR */
 
 	return ret;

@@ -549,7 +549,7 @@
 		prevention,short_strict_edge_condition = <160 60>;
 		prevention,large_strict_exit_condition = <4 4>;
 		prevention,top_corner_config = <500 1500 300>;
-		prevention,edge_swipe_config = <300 1000>;
+		prevention,edge_swipe_config = <300 665>;
 
 		prevention,curved_screen_V4;
 		prevention,long_eliminate_point_type = <2 22680 8400 300 24400 300 1>;
@@ -712,7 +712,7 @@
 		prevention,short_strict_edge_condition = <160 60>;
 		prevention,large_strict_exit_condition = <4 4>;
 		prevention,top_corner_config = <500 1500 300>;
-		prevention,edge_swipe_config = <300 1000>;
+		prevention,edge_swipe_config = <300 665>;
 
 		prevention,curved_screen_V4;
 		prevention,long_eliminate_point_type = <2 11160 8280 300 24840 300 1>;

@@ -1820,11 +1820,6 @@ int oplus_adfr_fakeframe_check(void *sde_encoder_virt)
 
 	ADFR_DEBUG("start\n");
 
-	if (!sde_enc || !sde_enc->crtc || !sde_enc->cur_master || !sde_enc->cur_master->connector) {
-		ADFR_ERR("invalid sde_enc params\n");
-		return -EINVAL;
-	}
-
 	c_conn = to_sde_connector(sde_enc->cur_master->connector);
 	if (!c_conn) {
 		ADFR_ERR("invalid c_conn param\n");
