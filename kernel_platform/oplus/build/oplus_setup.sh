@@ -55,7 +55,8 @@ print_platform()
     echo
     echo "select platform:"
     echo "   1.  waipio"
-    echo "   2.  reserve"
+    echo "   2.  kalama"
+    echo "   3.  reserve"
     echo
 }
 
@@ -80,12 +81,30 @@ choose_platform()
     case $ANSWER in
         1)
             variants_platform=waipio
+            pre_path=waipio
         ;;
         waipio)
             variants_platform=waipio
+            pre_path=waipio
+        ;;
+	2)
+            variants_platform=kalama
+            pre_path=kernel
+        ;;
+	kalama)
+            variants_platform=kalama
+            pre_path=kernel
+        ;;
+        crow)
+            variants_platform=kalama
+            pre_path=kernel
+        ;;
+        parrot)
+            variants_platform=parrot
         ;;
        *)
-            variants_platform=waipio
+            variants_platform=kalama
+            pre_path=kernel
         ;;
     esac
     echo "now default auto select platform $variants_platform "
