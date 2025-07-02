@@ -670,7 +670,6 @@ struct oplus_ufcs_chip {
 	struct delayed_work ufcs_uct_work;
 	struct delayed_work modify_cpufeq_work;
 	struct delayed_work ready_force2svooc_work;
-	struct delayed_work ucp_enable_work;
 
 	atomic_t ufcs_freq_state;
 
@@ -805,8 +804,8 @@ struct oplus_ufcs_operations {
 	int (*ufcs_get_cp_master_vac)(void);
 	int (*ufcs_get_cp_master_vout)(void);
 	int (*ufcs_get_cp_master_vbat)(void);
+
 	int (*ufcs_event_handle)(void);
-	bool (*ufcs_cp_ucp_enable)(void);
 };
 
 #ifndef OPLUS_UFCS_ENCRYPTION_H

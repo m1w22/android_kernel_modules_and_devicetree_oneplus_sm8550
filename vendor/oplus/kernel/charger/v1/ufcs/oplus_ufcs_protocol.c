@@ -2897,13 +2897,6 @@ static int oplus_ufcs_protocol_master_event_handle(void)
 	return ret;
 }
 
-static bool oplus_ufcs_ucp_enable(void)
-{
-	bool rc = true;
-
-	return rc;
-}
-
 struct oplus_ufcs_operations oplus_ufcs_protocol_ops = {
 	.ufcs_get_btb_temp_status = oplus_ufcs_protocol_get_btb_temp_status,
 	.ufcs_get_mos_temp_status = oplus_ufcs_protocol_get_mos_temp_status,
@@ -2944,7 +2937,6 @@ struct oplus_ufcs_operations oplus_ufcs_protocol_ops = {
 	.ufcs_get_mos1_switch = oplus_ufcs_protocol_get_mos1_switch,
 	.ufcs_set_mos1_switch = oplus_ufcs_protocol_set_mos1_switch,
 	.ufcs_event_handle = oplus_ufcs_protocol_master_event_handle,
-	.ufcs_cp_ucp_enable = oplus_ufcs_ucp_enable,
 };
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
